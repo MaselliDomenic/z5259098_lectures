@@ -3,6 +3,8 @@
 """
 from __future__ import annotations
 
+import os
+
 from tk_utils.api import (
         zipfile,
         shutil,
@@ -190,6 +192,48 @@ def backup(show_folder: bool = False, quiet: bool = False) -> None:
     _print_msg('Done', sep=False, color=None, quiet=quiet)
 
 
+class ZipFile(zipfile.ZipFile):
+    """ Patched ZipFile class to prevent errors of the type
+
+        ValueError: Empty filename.
+
+        when calling extractall
+    """
+
+    def extractall(self, path=None, members=None, pwd=None):
+        """Extract all members from the archive to the current working
+           directory. `path' specifies a different directory to extract to.
+           `members' is optional and must be a subset of the list returned
+           by namelist().
+        """
+        if members is None:
+            members = self.namelist()
+
+        if path is None:
+            path = os.getcwd()
+        else:
+            path = os.fspath(path)
+
+        for zipinfo in members:
+            if zipinfo == '/':
+                continue
+            self._extract_member(zipinfo, path, pwd)
+
+
+def _unzip(tmp, dst):
+    """  Wrapper around extractall
+
+    """
+    try:
+        with zipfile.ZipFile(tmp) as zf:
+            zf.extractall(dst)
+    except:
+        with ZipFile(tmp) as zf:
+            zf.extractall(dst)
+
+
+
+
 def sync_dbox(quiet: bool = False) -> None:
     """ Downloads the files from the Dropbox shared folder into "_dropbox".
 
@@ -260,8 +304,7 @@ def sync_dbox(quiet: bool = False) -> None:
     with open(tmp, 'wb') as fobj:
         fobj.write(r.content)
 
-    with zipfile.ZipFile(tmp) as zf:
-        zf.extractall(dst)
+    _unzip(tmp, dst)
 
     tmp.unlink()
     _print_msg('Done', sep=False, color=None, quiet=quiet)
