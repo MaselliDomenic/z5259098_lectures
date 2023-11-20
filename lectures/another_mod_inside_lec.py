@@ -3,5 +3,7 @@
 Another module inside the `lectures` package
 """
 
-# OLD: import mod_inside_lec
-from lectures import mod_inside_lec
+import mod_inside_lec
+import config
+
+#print(config.APIKEY)

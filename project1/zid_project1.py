@@ -77,17 +77,16 @@ def get_tics(pth):
         - No empty tickers or exchanges
 
     """
-    with open(pth, mode='rt') as tickers1:
-        tickers = []
-        for line in tickers1:
-            newline = line.lower().strip().replace('"', '').split('=')
-            exchange = newline[0]
-            ticker = newline[1]
-            if len(exchange) > 0 and len(ticker) > 0:
-                tickers.append(newline)
-        dict = {key:value for value, key in tickers}
-        return dict
-
+    with open(pth, mode = 'r') as tickfile:
+        tickerdic = {}
+        for line in tickfile:
+            exchange = line.lower().strip().strip('"').split("=")[0].strip('"')
+            ticker = line.lower().strip().strip('"').split("=")[1].strip('"')
+            if len(exchange) == 0 or len(ticker) == 0:
+                continue
+            else:
+                tickerdic[ticker] = exchange
+    return tickerdic
 
 # ----------------------------------------------------------------------------
 #   Please complete the body of this function so it matches its docstring
@@ -116,12 +115,12 @@ def read_dat(tic):
       module, the `DATDIR` constant, and f-strings.
 
     """
-    pth = os.path.join(DATDIR, f'{tic}_prc.dat')
-    with open(pth, mode='rt') as data:
-        list = []
-        for element in data:
-            list.append(element)
-        return list
+    pth = os.path.join(DATDIR, f"{tic}_prc.dat")
+    lines = []
+    with open(pth, mode = "r") as data:
+        for line in data:
+            lines.append(line)
+    return lines
 
 # ----------------------------------------------------------------------------
 #   Please complete the body of this function so it matches its docstring
@@ -155,12 +154,14 @@ def line_to_dict(line):
       sequentially.
 
     """
-    dict = COLWIDTHS.copy()
-    begin = 0
-    for key in COLUMNS:
-        dict[key] = line[begin:COLWIDTHS[key]+begin]
-        begin += COLWIDTHS[key]
-    return dict
+    width_start = 0
+    COLWIDTHSNEW = {}
+    for width_end, col in zip(COLWIDTHS.values(), COLUMNS):
+        COLWIDTHSNEW[col] = line[width_start:width_start+width_end]
+        width_start += width_end
+    return COLWIDTHSNEW
+
+
 # ----------------------------------------------------------------------------
 #   Please complete the body of this function so it matches its docstring
 #   description. See the assessment description file for more information.
@@ -195,15 +196,16 @@ def verify_tickers(tic_exchange_dic, tickers_lst=None):
                'Tsm' is not a key of tic_exchange_dic.
 
     """
-    ticsfromdic = sorted(list(tic_exchange_dic.keys()))
-    tickers_lst.sort()
     if tickers_lst is not None:
-        if len(tickers_lst):
-            for tic in tickers_lst:
-                if tic not in ticsfromdic:
-                    raise Exception("tickers_lst contains a ticker that does not correspond to a key tic_exchange_dic")
-        else:
+        if len(tickers_lst) == 0:
             raise Exception("tickers_lst is an empty list")
+        else:
+            for ticker in tickers_lst:
+                if ticker in tic_exchange_dic.keys():
+                    continue
+                else:
+                    raise Exception(f"tickers_lst contains a ticker '{ticker}' that does not correspond to a key tic_exchange_dic")
+
 
 # ----------------------------------------------------------------------------
 #   Please complete the body of this function so it matches its docstring
@@ -236,12 +238,15 @@ def verify_cols(col_lst=None):
 
     """
     if col_lst is not None:
-        if len(col_lst):
-            for col in col_lst:
-                if col not in COLUMNS:
-                    raise Exception("col_lst contains a column that is not found in COLUMNS")
-        else:
+        if len(col_lst) == 0:
             raise Exception("col_lst is an empty list")
+        else:
+            for col in col_lst:
+                if col in COLUMNS:
+                    continue
+                else:
+                    raise Exception(f" col_lst contains a column '{col}' that is not found in `COLUMNS`")
+
 
 # ----------------------------------------------------------------------------
 #   Please complete the body of this function so it matches its docstring
@@ -296,19 +301,33 @@ def create_data_dict(tic_exchange_dic, tickers_lst=None, col_lst=None):
     """
     verify_tickers(tic_exchange_dic, tickers_lst)
     verify_cols(col_lst)
-    dict = {}
-    for tic in tickers_lst:
-        lines = read_dat(tic) # a list with each line of that tickers datafile
-        listofdicts = []
-        for l in lines: # goes through each line of the tickers' datafile
-            linetodict = line_to_dict(l) # Returns a dictionary with format {COLUMNS: Value} e.g. {Open: 0.0003044}
-            col_dict = {}
-            for col in col_lst: # goes through the columns specified by col_lst
-                col_dict[col] = linetodict[col] # adds those columns and values to a new dictionary called col_dict
-            listofdicts.append(col_dict) # adds each dictionary for each line of that ticker into a list
-        data_dict = {'exchange' : tic_exchange_dic[tic], 'data' : listofdicts}
-        dict[tic] = data_dict
-    return dict
+    final_dic = {}
+
+    if tickers_lst is not None:
+        requiredtics = tickers_lst
+    else:
+        requiredtics = tic_exchange_dic.keys()
+
+
+
+
+    for tic in requiredtics:
+        sub_tic_dic = {}
+        sub_tic_dic['exchange'] = tic_exchange_dic[tic]
+        lines = read_dat(tic)
+        data_list = []
+        for line in lines:
+            if col_lst is not None:
+                requiredcols = col_lst
+            else:
+                requiredcols = line_to_dict(line).keys()
+            formattedline = line_to_dict(line)
+            data_list.append({l:formattedline[l] for l in formattedline if l in requiredcols})
+            sub_tic_dic['data'] = data_list
+            final_dic[tic] = sub_tic_dic
+
+    return final_dic
+
 
 
 # ----------------------------------------------------------------------------
@@ -335,8 +354,8 @@ def create_json(data_dict, pth):
             This function does not return anything
 
     """
-    with open(pth, 'w') as json_file:
-        json.dump(data_dict, json_file)
+    with open(f"{pth}", 'w') as json_file:
+        json.dump(data_dict, json_file, indent=2)
 
 
 
@@ -431,8 +450,8 @@ if __name__ == "__main__":
     # _test_get_tics()
     # _test_read_dat()
     # _test_line_to_dict()
-    # _test_create_data_dict()
-    # _test_create_json(os.path.join(DATDIR, 'data.json'))  # Save the file to data/data.json
+    _test_create_data_dict()
+    #_test_create_json(os.path.join(DATDIR, 'data.json'))  # Save the file to data/data.json
     pass
 
 

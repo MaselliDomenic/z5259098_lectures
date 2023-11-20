@@ -5,6 +5,8 @@ CSV file
 """
 
 import os
+
+import toolkit_config
 import toolkit_config as cfg
 import yf_example2
 
@@ -16,16 +18,10 @@ def qan_prc_to_csv(year):
         year : int
             An integer with a four-digit year
         """
-    tic = 'QAN.AX'
-    start = f'{year}-01-01'
-    end = f'{year}-12-31'
-    pth = os.path.join(cfg.DATADIR, f'qan_prc_{year}.csv')
-    df = yf_example2.yf_prc_to_csv(
-        tic=tic,
-        pth=pth,
-        start=start,
-        end=end)
-
+    pth = os.path.join(toolkit_config.DATADIR, f'qan_prc_{year}.csv')
+    start = f"{year}-01-01"
+    end = f"{year}-12-31"
+    yf_example2.yf_prc_to_csv("QAN.AX", pth, start, end)
 
 if __name__ == "__main__":
     year = 2020
